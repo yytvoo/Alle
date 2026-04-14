@@ -4,6 +4,7 @@ import sendWebhook from '@/lib/webhook/webhook'
 import sendTelegramMessage from '@/lib/telegram/telegram'
 import PostalMime from "postal-mime";
 import * as cheerio from 'cheerio';
+import { DEFAULT_EXTRACT_RESULT } from "@/types";
 import type { Email, NewEmail } from "@/types";
 
 
@@ -50,7 +51,9 @@ export default async function storeEmail(
 
         const allContent = [email.subject || '', email.text || '', emailText].filter(Boolean).join('\n');
 
-        const result = await extract(allContent, env);
+        const result = env.ENABLE_AI_EXTRACT?.trim().toLowerCase() === 'true'
+            ? await extract(allContent, env)
+            : DEFAULT_EXTRACT_RESULT;
 
         console.log(result.type, result.result, result.result_text);
 
