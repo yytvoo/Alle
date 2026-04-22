@@ -79,12 +79,14 @@ export default async function storeEmail(
 
         const res = await emailDB.create(env, emailData);
 
-        if (env.WEBHOOK_URL && env.WEBHOOK_TEMPLATE && env.WEBHOOK_TYPE.split(',').includes(emailData.emailType)) {
-            await sendWebhook(replaceTemplateAdvanced(env.WEBHOOK_TEMPLATE, res), env.WEBHOOK_URL);
+        if (env.WEBHOOK_URL && env.WEBHOOK_TEMPLATE && env.WEBHOOK_TYPE.split(',').map(t => t.trim()).includes(emailData.emailType)) {
+            const webhookPayload = replaceTemplateAdvanced(env.WEBHOOK_TEMPLATE, res);
+            console.log('Sending webhook to:', env.WEBHOOK_URL, 'type:', emailData.emailType);
+            await sendWebhook(webhookPayload, env.WEBHOOK_URL);
         }
 
         // 发送到Telegram Bot
-        if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID && env.TELEGRAM_TEMPLATE && env.TELEGRAM_TYPE && env.TELEGRAM_TYPE.split(',').includes(emailData.emailType)) {
+        if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID && env.TELEGRAM_TEMPLATE && env.TELEGRAM_TYPE && env.TELEGRAM_TYPE.split(',').map(t => t.trim()).includes(emailData.emailType)) {
             await sendTelegramMessage(
                 replaceTemplateAdvanced(env.TELEGRAM_TEMPLATE, res),
                 env.TELEGRAM_BOT_TOKEN,
