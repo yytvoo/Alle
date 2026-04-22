@@ -1,24 +1,8 @@
-function normalizePayload(payload: string): string {
-    try {
-        return JSON.stringify(JSON.parse(payload))
-    } catch {}
-
-    // Over-escaped quotes from CI env var pipeline: \" \\\" \\\\\" etc.
-    const unescaped = payload.replace(/\\+"/g, '"')
-    try {
-        return JSON.stringify(JSON.parse(unescaped))
-    } catch {}
-
-    return payload
-}
-
 export default async function sendWebhook(payload: string, url: string): Promise<void> {
     if (!url) {
         console.error('Webhook error: URL is required')
         return
     }
-
-    const body = normalizePayload(payload)
 
     try {
         const controller = new AbortController()
@@ -28,7 +12,7 @@ export default async function sendWebhook(payload: string, url: string): Promise
             headers: {
                 'Content-Type': 'application/json',
             },
-            body,
+            body: payload,
             signal: controller.signal
         })
 
