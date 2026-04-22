@@ -8,18 +8,60 @@ import { DEFAULT_EXTRACT_RESULT } from "@/types";
 import type { Email, NewEmail } from "@/types";
 
 
-function replaceTemplateAdvanced(template: string, email: Email): string {
-    const replacer = (_match: string, key: string): string => {
+function replaceVars(str: string, email: Email): string {
+    const fn = (_match: string, key: string): string => {
         const value = email[key as keyof Email];
         if (value === null || value === undefined) {
             return '';
         }
-        return JSON.stringify(String(value)).slice(1, -1);
+        return String(value);
     };
-    // Handle {{variable}} first, then remaining {variable}
+    return str
+        .replace(/\{\{(\w+)\}\}/g, fn)
+        .replace(/{(\w+)}/g, fn);
+}
+
+function replaceInValue(value: unknown, email: Email): unknown {
+    if (typeof value === 'string') {
+        return replaceVars(value, email);
+    }
+    if (Array.isArray(value)) {
+        return value.map(item => replaceInValue(item, email));
+    }
+    if (value !== null && typeof value === 'object') {
+        const result: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(value)) {
+            result[k] = replaceInValue(v, email);
+        }
+        return result;
+    }
+    return value;
+}
+
+function processTemplate(template: string, email: Email): string {
+    // Try to parse as JSON, walk tree, replace vars in string values, then stringify.
+    // This avoids all escaping issues from CI/config pipeline.
+    for (const input of [template, template.replace(/\\+"/g, '"')]) {
+        try {
+            const parsed = JSON.parse(input);
+            return JSON.stringify(replaceInValue(parsed, email));
+        } catch {
+            continue;
+        }
+    }
+
+    // Fallback: raw string replacement with JSON-safe value escaping
     return template
-        .replace(/\{\{(\w+)\}\}/g, replacer)
-        .replace(/{(\w+)}/g, replacer);
+        .replace(/\{\{(\w+)\}\}/g, (_match: string, key: string) => {
+            const value = email[key as keyof Email];
+            if (value === null || value === undefined) return '';
+            return JSON.stringify(String(value)).slice(1, -1);
+        })
+        .replace(/{(\w+)}/g, (_match: string, key: string) => {
+            const value = email[key as keyof Email];
+            if (value === null || value === undefined) return '';
+            return JSON.stringify(String(value)).slice(1, -1);
+        });
 }
 
 export default async function storeEmail(
@@ -84,7 +126,7 @@ export default async function storeEmail(
         const res = await emailDB.create(env, emailData);
 
         if (env.WEBHOOK_URL && env.WEBHOOK_TEMPLATE && env.WEBHOOK_TYPE.split(',').map(t => t.trim()).includes(emailData.emailType)) {
-            const webhookPayload = replaceTemplateAdvanced(env.WEBHOOK_TEMPLATE, res);
+            const webhookPayload = processTemplate(env.WEBHOOK_TEMPLATE, res);
             console.log('Sending webhook to:', env.WEBHOOK_URL, 'type:', emailData.emailType, 'payload:', webhookPayload);
             await sendWebhook(webhookPayload, env.WEBHOOK_URL);
         }
@@ -92,7 +134,7 @@ export default async function storeEmail(
         // 发送到Telegram Bot
         if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID && env.TELEGRAM_TEMPLATE && env.TELEGRAM_TYPE && env.TELEGRAM_TYPE.split(',').map(t => t.trim()).includes(emailData.emailType)) {
             await sendTelegramMessage(
-                replaceTemplateAdvanced(env.TELEGRAM_TEMPLATE, res),
+                processTemplate(env.TELEGRAM_TEMPLATE, res),
                 env.TELEGRAM_BOT_TOKEN,
                 env.TELEGRAM_CHAT_ID
             );
