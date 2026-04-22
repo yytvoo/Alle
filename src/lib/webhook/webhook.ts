@@ -6,7 +6,7 @@ export default async function sendWebhook(payload: string, url: string): Promise
 
     try {
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        const timeoutId = setTimeout(() => controller.abort(), 10000)
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -18,12 +18,24 @@ export default async function sendWebhook(payload: string, url: string): Promise
 
         clearTimeout(timeoutId)
 
+        const body = await response.text()
+
         if (!response.ok) {
-            const errorBody = await response.text()
-            console.error('Webhook error:', `HTTP ${response.status}: ${response.statusText}`, errorBody)
-        } else {
-            console.log('Webhook sent successfully:', url)
+            console.error('Webhook error:', `HTTP ${response.status}: ${response.statusText}`, body)
+            return
         }
+
+        try {
+            const result = JSON.parse(body)
+            if (result.errcode !== undefined && result.errcode !== 0) {
+                console.error('Webhook API error:', result)
+                return
+            }
+        } catch {
+            // response is not JSON, ignore
+        }
+
+        console.log('Webhook sent successfully:', url, body)
     } catch (error) {
         console.error('Webhook error:', error)
     }
