@@ -1,15 +1,15 @@
 function normalizePayload(payload: string): string {
     try {
         return JSON.stringify(JSON.parse(payload))
-    } catch {
-        // Template contains escaped quotes (e.g. from CI env vars), try to recover
-        const unescaped = payload.replace(/\\"/g, '"').replace(/\\n/g, '\n')
-        try {
-            return JSON.stringify(JSON.parse(unescaped))
-        } catch {
-            return payload
-        }
-    }
+    } catch {}
+
+    // Over-escaped quotes from CI env var pipeline: \" \\\" \\\\\" etc.
+    const unescaped = payload.replace(/\\+"/g, '"')
+    try {
+        return JSON.stringify(JSON.parse(unescaped))
+    } catch {}
+
+    return payload
 }
 
 export default async function sendWebhook(payload: string, url: string): Promise<void> {
