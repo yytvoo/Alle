@@ -4,16 +4,14 @@ export default async function sendWebhook(payload: string, url: string): Promise
         return
     }
 
-    const requestHeaders = {
-        'Content-Type': 'application/json',
-    }
-
     try {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 5000)
         const response = await fetch(url, {
             method: 'POST',
-            headers: requestHeaders,
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: payload,
             signal: controller.signal
         })
@@ -21,8 +19,10 @@ export default async function sendWebhook(payload: string, url: string): Promise
         clearTimeout(timeoutId)
 
         if (!response.ok) {
-            const errorMsg = `HTTP ${response.status}: ${response.statusText}`
-            console.error('Webhook error:', errorMsg)
+            const errorBody = await response.text()
+            console.error('Webhook error:', `HTTP ${response.status}: ${response.statusText}`, errorBody)
+        } else {
+            console.log('Webhook sent successfully:', url)
         }
     } catch (error) {
         console.error('Webhook error:', error)
