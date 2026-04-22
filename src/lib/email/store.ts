@@ -9,13 +9,17 @@ import type { Email, NewEmail } from "@/types";
 
 
 function replaceTemplateAdvanced(template: string, email: Email): string {
-    return template.replace(/{(\w+)}/g, (match, key) => {
+    const replacer = (_match: string, key: string): string => {
         const value = email[key as keyof Email];
         if (value === null || value === undefined) {
             return '';
         }
         return JSON.stringify(String(value)).slice(1, -1);
-    });
+    };
+    // Handle {{variable}} first, then remaining {variable}
+    return template
+        .replace(/\{\{(\w+)\}\}/g, replacer)
+        .replace(/{(\w+)}/g, replacer);
 }
 
 export default async function storeEmail(
