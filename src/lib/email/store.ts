@@ -81,7 +81,7 @@ export default async function storeEmail(
 
         if (env.WEBHOOK_URL && env.WEBHOOK_TEMPLATE && env.WEBHOOK_TYPE.split(',').map(t => t.trim()).includes(emailData.emailType)) {
             const webhookPayload = replaceTemplateAdvanced(env.WEBHOOK_TEMPLATE, res);
-            console.log('Sending webhook to:', env.WEBHOOK_URL, 'type:', emailData.emailType);
+            console.log('Sending webhook to:', env.WEBHOOK_URL, 'type:', emailData.emailType, 'payload:', webhookPayload);
             await sendWebhook(webhookPayload, env.WEBHOOK_URL);
         }
 
