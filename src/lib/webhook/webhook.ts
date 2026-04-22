@@ -1,8 +1,24 @@
+function normalizePayload(payload: string): string {
+    try {
+        return JSON.stringify(JSON.parse(payload))
+    } catch {
+        // Template contains escaped quotes (e.g. from CI env vars), try to recover
+        const unescaped = payload.replace(/\\"/g, '"').replace(/\\n/g, '\n')
+        try {
+            return JSON.stringify(JSON.parse(unescaped))
+        } catch {
+            return payload
+        }
+    }
+}
+
 export default async function sendWebhook(payload: string, url: string): Promise<void> {
     if (!url) {
         console.error('Webhook error: URL is required')
         return
     }
+
+    const body = normalizePayload(payload)
 
     try {
         const controller = new AbortController()
@@ -12,21 +28,21 @@ export default async function sendWebhook(payload: string, url: string): Promise
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: payload,
+            body,
             signal: controller.signal
         })
 
         clearTimeout(timeoutId)
 
-        const body = await response.text()
+        const resBody = await response.text()
 
         if (!response.ok) {
-            console.error('Webhook error:', `HTTP ${response.status}: ${response.statusText}`, body)
+            console.error('Webhook error:', `HTTP ${response.status}: ${response.statusText}`, resBody)
             return
         }
 
         try {
-            const result = JSON.parse(body)
+            const result = JSON.parse(resBody)
             if (result.errcode !== undefined && result.errcode !== 0) {
                 console.error('Webhook API error:', result)
                 return
@@ -35,7 +51,7 @@ export default async function sendWebhook(payload: string, url: string): Promise
             // response is not JSON, ignore
         }
 
-        console.log('Webhook sent successfully:', url, body)
+        console.log('Webhook sent successfully:', url, resBody)
     } catch (error) {
         console.error('Webhook error:', error)
     }
